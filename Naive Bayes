@@ -1,0 +1,34 @@
+#load the data 
+library(readr)
+df <- read_csv("C:/Users/spatel4/Downloads/MovieReviews.csv")
+str(df)
+#manage the data 
+
+everyColumn = colnames(df)
+df[everyColumn] = lapply(df[everyColumn], as.factor)
+
+
+
+#partition the data 
+N = nrow(df)
+trainingSize = round(N*0.8)
+trainingCases = sample(N, trainingSize)
+training = df[trainingCases,]
+test = df[-trainingCases,]
+
+#build model 
+Model = naiveBayes(PositiveTweet~., data= training)
+
+
+#predictions
+pred = predict(Model,test, type= "raw")
+pred = pred[,2]
+
+predTF = (pred > 0.5)
+obs = test$PositiveTweet
+obsTF = obs == "1"
+
+
+#evaluate performance 
+error = sum(obsTF !=predTF)/nrow(test)
+error_bench = benchmarkErrorRate(training$PositiveTweet, test$PositiveTweet)
