@@ -1,0 +1,28 @@
+#Load the data 
+library(readr)
+df = BostonHousing
+source('C:/Users/spatel4/Desktop/BabsonAnalytics.R')
+
+#manage the data 
+df$CHAS = NULL
+df$RAD = NULL
+df$ISHIGHVAL = as.factor(df$ISHIGHVAL)
+df$MEDV = NULL
+
+#partition the data 
+N = nrow(df)
+trainingSize = round(N*0.6)
+trainingCases = sample(N, trainingSize)
+training = df[trainingCases,]
+test = df[-trainingCases,]
+
+#create model #make predictions 
+library(class)
+predictions = kNN(ISHIGHVAL ~ ., training, test, k=k_best)
+observations = test$ISHIGHVAL
+k_best = kNNCrossVal(ISHIGHVAL ~ . , training)
+
+#evaluate performance
+table(predictions, observations)
+error_rate = 1 - sum(predictions ==observations)/nrow(test)
+error_bench = benchmarkErrorRate(training$ISHIGHVAL, test$ISHIGHVAL)
