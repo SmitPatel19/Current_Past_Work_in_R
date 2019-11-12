@@ -1,0 +1,66 @@
+#load data
+source('C:/Users/spatel4/Desktop/BabsonAnalytics.R')
+library(readr)
+df <- read_csv("C:/Users/spatel4/Downloads/ToyotaCorolla (1).csv")
+str(df)
+
+
+#manage data
+df$Model = NULL #remove this because this is a very detailed variable that does not make sense to keep in logically since knowning the model type of the car is a pretty good indicator in estimating the price beforhand and can lead to bias. 
+df$Automatic = as.factor(df$Automatic)
+df$Met_Color = as.factor(df$Met_Color)
+
+
+#partition data
+N = nrow(df)
+trainingSize = round(N*0.6)
+trainingCases = sample(N, trainingSize)
+training = df[trainingCases,]
+test = df[-trainingCases,]
+#build model
+DefaultModel=rpart(Price ~ ., data=training)
+rpart.plot(DefaultModel)
+
+stoppingRules = rpart.control(minsplit = 2, minbucket = 1, cp=0)
+bigmodel = rpart(Price ~ . , data =training, control = stoppingRules)
+
+PruneModel =  easyPrune(bigmodel)
+rpart.plot(PruneModel)
+
+LinRegModel = lm(Price ~  ., data=training)
+
+
+
+#make prediction 
+PredDefaultModel = predict(DefaultModel, test)
+ObsDefaultModel = test$Price
+ErrorsDefaultModel = ObsDefaultModel - PredDefaultModel
+
+PredPruneModel = predict(PruneModel, test)
+ObsPruneModel = test$Price
+ErrorsPruneModel = ObsPruneModel - PredPruneModel
+
+PredLinRegModel = predict(LinRegModel, test) 
+ObsLinRegModel = test$Price
+ErrorsLinReg = ObsLinRegModel-PredLinRegModel
+
+
+#evaluate performence
+rmseDefault = sqrt(mean(ErrorsDefaultModel^2))
+mapeDefault = mean(abs(ErrorsDefaultModel/ObsDefaultModel))
+
+rmsePrune = sqrt(mean(ErrorsPruneModel^2)) 
+mapePrune = mean(abs(ErrorsPruneModel/ObsPruneModel)) #the more complex model had slight improvements in terms of rmse and mape, but in real world is it worth it?
+
+benchmark_guess = mean(training$Price)
+benchmark_errors = ObsDefaultModel- benchmark_guess
+benchmark_rmse = sqrt(mean(benchmark_errors^2)) #this benchmark rmse is the ornaginc error is we were to do nothing to the data set.
+benchmark_mape = mean(abs(benchmark_errors/obs)) #This benchmark mape is the % is .245 whihc means organically if we did nothing this is the error we would expect 
+#Yes my models are better because , lower rmse and mape values 
+
+rmseLinRegModel = sqrt(mean(ErrorsLinReg^2))
+mapeLinRegModel = mean(abs(ErrorsLinReg/ObsLinRegModel))
+
+#LinRegModel performed in the middle, outperforming Default but not being able to beat Prune model
+
+
