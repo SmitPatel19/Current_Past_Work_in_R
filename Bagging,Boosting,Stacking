@@ -1,0 +1,79 @@
+#Load 
+library(readr)
+library(gbm)
+library(rpart)
+library(randomForest)
+df <- read_csv("C:/Users/spatel4/Downloads/BostonHousing (4).csv")
+source('C:/Users/spatel4/Desktop/BabsonAnalytics.R')
+str(df)
+
+#Manage
+df$ISHIGHVAL = as.logical(df$ISHIGHVAL)
+df$MEDV = NULL
+
+
+#Partition 
+N= nrow(df)
+trainingSize= round(N*0.6)
+trainingCases= sample(N,trainingSize)
+train = df[trainingCases,]
+test = df[-trainingCases,]
+
+#Build 
+tree = rpart(ISHIGHVAL ~., data=train)
+
+
+#Predict 
+pred= predict(tree, test)
+pred_tree = (pred > 0.5)
+
+#Evaluate 
+error_tree = sum(pred_tree != test$ISHIGHVAL)/nrow(test)
+
+#-------------------------------------------------------------------------------------------------------
+
+#bagging
+
+#load
+library(randomForest)
+
+#build
+rf= randomForest(ISHIGHVAL ~., data= train,ntree=500)
+
+#predict
+pred_rf = predict(rf, test)
+pred_rf = (pred_rf > 0.5)
+
+#evaluate
+error_rf = sum(pred_rf != test$ISHIGHVAL)/nrow(test)
+
+#--------------------------------------------------------------------------------------------------
+
+
+#boosting
+
+#load
+library(gbm)
+
+#build 
+boost= gbm(ISHIGHVAL ~., data=train, n.trees = 20000, cv.folds = 4)
+best_iter = gbm.perf(boost,method="cv")
+
+#predict 
+pred_boost = predict(boost, test, best_iter)
+pred_boost = (pred_boost > 0.5)
+
+#evaluate 
+error_boost = sum(pred_boost != test$ISHIGHVAL)/nrow(test)
+
+#--------------------------------------------------------------------------------------------------------
+#stacking
+
+pred_boost_full = predict(boost,df,best_iter)
+pred_rf_full = predict(rf,df)
+
+df_stacked = cbind(df, pred_boost_full, pred_rf_full)
+train_stacked = df_stacked[trainingCases,]
+test_stacked = df_stacked[-trainingCases,]
+
+#INCOMPLETE!!!
