@@ -1,0 +1,64 @@
+#Load 
+library(readr)
+library(nnet)
+library(caret)
+library(NeuralNetTools)
+source('C:/Users/spatel4/Desktop/BabsonAnalytics.R')
+df<- read_csv("C:/Users/spatel4/Downloads/UniversalBank (3).csv")
+str(df)
+
+#Manage 
+df$ID=         NULL
+df$`ZIP Code`= NULL
+
+cat = c("Education","Personal Loan", "Securities Account", "CD Account", "Online","CreditCard")
+df[cat] = lapply(df[cat], as.factor)
+lapply(df[cat],unique)
+
+normalizer = preProcess(df, method =c("range"))
+df = predict(normalizer,df)
+
+#Partition 
+N= nrow(df)
+trainingSize= round(N*0.6)
+trainingCases= sample(N,trainingSize)
+training = df[trainingCases,]
+test = df[-trainingCases,]
+
+
+#Build 
+model_nnet = nnet(`Personal Loan` ~ ., data = training, size=4)
+plotnet(model_nnet)#No it clearly does not. Way to complicated. But we do see that family , age, and expereince have signifacnt say in how they affect the outcome (darker more black lines)
+
+model_logReg = glm(`Personal Loan` ~., data=training, family = binomial)#problem does not state to control for overfitting, so as much as it pains me to countinue, I guess I have too =(
+
+
+#Predict 
+predNum_nnet = predict(model_nnet, test)
+pred_nnet = as.factor(predict(model_nnet, test, type ="class"))
+
+pred_logReg = predict(model_logReg, test, type ="response")
+pred_logRegTF = (pred_logReg > 0.5) #covert probabilities to logicals
+Obs = test$`Personal Loan`
+ObsTF = Obs == "1"
+
+#Evaluate 
+table(pred_nnet, test$`Personal Loan`)
+table(Obs, pred_logRegTF)
+
+error_bench = benchmarkErrorRate(training$`Personal Loan`, test$`Personal Loan`)
+
+error_rate_nnet = sum(pred_nnet != test$`Personal Loan`)/nrow(test)
+
+error_rate_logReg = sum(pred_logRegTF != ObsTF)/nrow(test) #The error rate for the logistic regression model performed worse then neural nets model, .0425 is worse then .019
+
+#Logistic Regression 
+#Pro for this case: We removed varaibles that were not related to the output, helping logistic regression out, also our target is a logical!
+#Con for this case: does not handle large numbers of categorical varaibles that well, and relies on the transformation of non-linear features
+
+#Neural Nets
+#Pro for this case: Our inputs and target match nnets requirments (not that big of a deal since it can take both num/cat variables for both in/out puts). Cna handle "larger" amounts of data like in this data set of 5000 rows. Also good at modeling nonlinear data. 
+#Con for this case: We cant see how much eash varible is affecting target ( exact wise, we an relative with darkness of connecting lines). Can be prone to overfitting since heavy relience on training data. 
+
+
+
