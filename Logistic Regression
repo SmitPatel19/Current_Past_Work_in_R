@@ -1,0 +1,40 @@
+#load that data
+library(readr)
+df <- read_csv("C:/Users/spatel4/Downloads/BostonHousing (3).csv")
+str(df)
+
+#manage the data
+df$ISHIGHVAL = as.logical(df$ISHIGHVAL)
+df$MEDV = NULL
+df$CHAS = as.logical(df$CHAS)
+df$RAD = as.factor(df$RAD)
+
+#partition data
+N = nrow(df)
+trainingSize = round(N*0.7)
+trainingCases = sample(N, trainingSize)
+training =df [trainingCases,]
+test = df[-trainingCases,]
+
+#build model
+model = glm(ISHIGHVAL ~., data=training, family = binomial)
+model = step(model)
+summary(model)
+#CRIM        -0.105933   0.075948  -1.395 0.163072
+#if crim increases by 1 unit, then the odds that the 
+#neighborhood is high value decreases by a multiplicative
+#factor of e(-.105), or roughly 90%
+#so if the old odds are 100:1, the new odds are 90:1
+
+#make predictions
+pred = predict(model, test, type ="response")
+pred = (pred > 0.5) #covert probabilities to logicals
+obs = test$ISHIGHVAL
+
+
+#evaluate performance
+table(obs, pred)
+error = sum(pred != obs)/nrow(test)
+error_bench = benchmarkErrorRate(training$ISHIGHVAL, test$ISHIGHVAL)
+sensitivity = sum(pred == TRUE & obs == TRUE)/sum(obs == TRUE)
+specificity = sum(pred == FALSE & obs == FALSE)/sum(obs == FALSE)
