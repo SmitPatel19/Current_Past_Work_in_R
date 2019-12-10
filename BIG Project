@@ -1,0 +1,200 @@
+#Load the data
+library(readr)
+library(rpart)
+library(rpart.plot)
+library(forcats)
+library(randomForest)
+library(gbm)
+library(caret)
+library(nnet)
+library(NeuralNetTools)
+
+source('C:/Users/spatel4/Desktop/BabsonAnalytics.R')
+
+df <- read_csv("C:/Users/spatel4/Downloads/train.csv")
+
+str(df)
+
+
+#manage the data
+cat = c("MSSubClass","MSZoning", "Street", "Alley","LotShape","LandContour", "LotConfig","LandSlope",
+        "Neighborhood", "Condition1", "Condition2", "BldgType", "HouseStyle","OverallQual", "OverallCond", "RoofMatl",
+        "RoofStyle", "Exterior1st","Exterior2nd","ExterQual", "MasVnrType","ExterCond", "Foundation", "BsmtQual", "BsmtCond",
+        "BsmtExposure", "BsmtFinType1", "BsmtFinType2","Heating","CentralAir", "HeatingQC", "Electrical", "KitchenQual",
+        "Functional", "FireplaceQu", "GarageType", "GarageFinish", "GarageQual", "GarageCond", "PavedDrive",
+        "PoolQC", "Fence", "SaleType", "SaleCondition")
+df[cat] = lapply(df[cat], as.factor)
+lapply(df[cat],unique)
+
+df$Utilities =   NULL #Not impactful to dataset because all houses have access to public utilities
+df$MiscFeature=  NULL #Not impactful to target value
+df$MiscVal =     NULL #Not impactful to target value
+df$Id =          NULL #This is a unique value assigned to each and every single row and can not be used
+
+
+levels(df$Alley)= c("Grvl","Pave","None")
+df$Alley[is.na(df$Alley)] = "None"
+
+levels(df$MasVnrType)= c("BrkCmn", "BrkFace","CBlock", "None", "Stone")
+df$MasVnrType[is.na(df$MasVnrType)] = "None"
+
+levels(df$BsmtFinType1)= c("GLQ","ALQ","BLQ","Rec","LwQ", "Unf","None")
+df$BsmtFinType1[is.na(df$BsmtFinType1)] = "None"
+
+levels(df$BsmtFinType2)=c("GLQ","ALQ","BLQ","Rec","LwQ", "Unf","None")
+df$BsmtFinType2[is.na(df$BsmtFinType2)] = "None"
+
+levels(df$FireplaceQu)=c("Ex","Gd", "TA","Fa","Po", "None")
+df$FireplaceQu[is.na(df$FireplaceQu)] = "None"
+
+levels(df$GarageFinish)=c("Fin","RFn", "Unf", "None")
+df$GarageFinish[is.na(df$GarageFinish)] = "None"
+
+levels(df$GarageType)= c("2Types", "Attchd", "Basment", "BuiltIn","CarPort", "Detchd","None")
+df$GarageType[is.na(df$GarageType)] = "None"
+
+levels(df$GarageQual)= c("Ex","Gd", "TA","Fa","Po", "None")
+df$GarageQual[is.na(df$GarageQual)] = "None"
+
+levels(df$GarageCond)= c("Ex","Gd", "TA","Fa","Po", "None")
+df$GarageCond[is.na(df$GarageCond)] = "None"
+
+levels(df$PoolQC)= c("Ex","Gd", "TA","Fa", "None")
+df$PoolQC[is.na(df$PoolQC)] = "None"
+
+levels(df$Fence)= c("GdPrv", "MnPrv", "GdWo", "MnWw", "None")
+df$Fence[is.na(df$Fence)] = "None"
+
+
+df$Exterior1st = fct_lump(df$Exterior1st, prop=.1)
+df$Condition2 = fct_lump(df$Condition2, prop=.1)
+df$MSZoning = fct_lump(df$MSZoning, prop=.1)
+df$OverallCond = fct_lump(df$OverallCond, prop=.1)
+df$Exterior2nd = fct_lump(df$Exterior2nd, prop=.1)
+df$ExterQual = fct_lump(df$ExterQual, prop=.1)
+df$BsmtQual = fct_lump(df$BsmtQual, prop=.1)
+df$BsmtCond = fct_lump(df$BsmtCond, prop=.1)
+df$BsmtExposure = fct_lump(df$BsmtExposure, prop=.1)
+df$KitchenQual = fct_lump(df$KitchenQual, prop =.1)
+df$Functional = fct_lump(df$Functional, prop=.1)
+df$PoolQC = fct_lump(df$PoolQC, prop=.1)
+df$SaleType = fct_lump(df$SaleType, prop=.1)
+df$RoofMatl = fct_lump(df$RoofMatl, prop=.1)
+df$OverallQual = fct_lump(df$OverallQual, prop =.1)
+df$RoofStyle = fct_lump(df$RoofStyle, prop = .1)
+df$Foundation = fct_lump(df$Foundation, prop = .1)
+df$Condition1 = fct_lump(df$Condition1, prop = .1)
+df$BsmtFinType1 = fct_lump(df$BsmtFinType1, prop =.1)
+df$Heating = fct_lump(df$Heating, prop =.1)
+df$GarageType = fct_lump(df$GarageType, prop =.1)
+df$HeatingQC = fct_lump(df$HeatingQC, prop =.1)
+df$Electrical = fct_lump(df$Electrical, prop =.1)
+df$GarageFinish = fct_lump(df$GarageFinish, prop =.1)
+df$BsmtFinType2 = fct_lump(df$BsmtFinType2, prop =.1)
+df$MSSubClass = fct_lump(df$MSSubClass, prop =.1)
+df$ExterCond = fct_lump(df$ExterCond, prop =.1)
+df$SaleCondition = fct_lump(df$SaleCondition, prop=.1)
+
+df=na.omit(df)
+
+df= removeOutliers(df)
+
+names(df)[42]= "FirstFloorSqFt" #Had to rename since the code of bagging does not allow column names to begin with a number
+names(df)[43]= "SecondFloorSqFt" #Had to rename since the code of bagging does not allow column names to begin with a number
+names(df)[68]= "ThreeSsnPorch" #Had to rename since the code of bagging does not allow column names to begin with a number
+colnames(df)
+
+
+#partition the data
+N= nrow(df)
+trainingSize= round(N*0.8)
+trainingCases= sample(N,trainingSize)
+training = df[trainingCases,]
+test = df[-trainingCases,]
+
+#build model 
+LinRegModel= lm(SalePrice ~ .,data = training)
+summary(LinRegModel)
+LinRegModel=step(LinRegModel)
+summary(LinRegModel)
+
+
+RegTreeModel = rpart(SalePrice ~ . , data =training)
+rpart.plot(RegTreeModel)
+RegTreeModelPruned= easyPrune(RegTreeModel)
+rpart.plot(RegTreeModelPruned)
+
+
+#make predcitions
+PredLinRegModel = predict(LinRegModel, test)
+Obs = test$SalePrice
+
+PredRegTreeModelPruned = predict(RegTreeModelPruned, test)
+
+
+#evaluate performance
+LinRegErrors = Obs-PredLinRegModel
+RegTreeErrors = Obs - PredRegTreeModelPruned
+
+LinRegMape = mean(abs(LinRegErrors)/Obs)
+LinRegRmse = sqrt(mean(LinRegErrors^2))
+
+RegTreePrunedMape = mean(abs(RegTreeErrors)/Obs)
+RegTreePrunedRmse = sqrt(mean(RegTreeErrors^2))
+
+
+#Compare performance to bencmarks
+BenchmarkError = Obs - mean(training$SalePrice)
+Benchmarkmape = mean(abs(BenchmarkError)/Obs)
+Benchmarkrmse = sqrt(mean(BenchmarkError^2))
+
+#--------------------------------------NeuralNet--------------------------------------------------------------------------------------------------------------
+
+normalizer = preProcess(df, method = c("range"))
+df_normalized = predict(normalizer, df)
+training_norm = df_normalized[trainingCases,]
+test_norm = df_normalized[-trainingCases,]
+NNetModel = nnet(SalePrice ~., data = training_norm,size = 4, linout = TRUE)
+
+PredNNetModel = predict(NNetModel, test_norm)
+
+StdDev = sd(df$SalePrice)
+Mean = mean(df$SalePrice)
+
+PredNNetActualModel = PredNNetModel*StdDev + Mean
+Obs = test$SalePrice
+
+NNetErrors = Obs- PredNNetActualModel
+
+
+NNetMape = mean(abs(NNetErrors)/Obs)
+NNetRmse = sqrt(mean(NNetErrors^2))
+
+
+
+#--------------------------------------Bagging----------------------------------------------------------------------------------------------------------------
+rf= randomForest(SalePrice ~ ., data = training,ntree=500)
+
+pred_rf = predict(rf, test)
+
+BaggingErrors = Obs- pred_rf
+
+BaggingMape= mean(abs(BaggingErrors)/Obs)
+BaggingRMSE = sqrt(mean(BaggingErrors)^2)
+
+
+
+#--------------------------------------Stacking-------------------------------------------------------------------------------------------------------------------------
+
+df_stacked = cbind(df, PredLinRegModel, PredNNetActualModel, PredRegTreeModelPruned)
+train_stacked = df_stacked[trainingCases,]
+test_stacked = df_stacked[-trainingCases,]
+
+stacked = glm(SalePrice ~ ., data = train_stacked)
+pred_stacked = predict(stacked, test_stacked)
+
+StackedErrors = Obs- pred_stacked
+
+StackedMape = mean(abs(StackedErrors)/Obs) 
+StackedRMSE = sqrt(mean(StackedErrors)^2)
+
